@@ -18,6 +18,11 @@ export class BrowserService {
   private readonly logger = new Logger(BrowserService.name);
   constructor(private readonly parserService: ParserService) {}
 
+  /**
+   * Scans a web page and returns its normalized content.
+   * @param {RequestDto} requestDto - The request data transfer object containing URL and optional authentication details.
+   * @returns {Promise<string>} - A promise that resolves to the normalized HTML content of the web page.
+   */
   async scanPage(requestDto: RequestDto): Promise<string> {
     const start = performanceNow();
     const browser = await this.launchBrowser(requestDto);
@@ -45,7 +50,12 @@ export class BrowserService {
     return jsonContent;
   }
 
-  private async launchBrowser(requestDto: RequestDto) {
+  /**
+   * Launches a Puppeteer browser instance with specified options.
+   * @param {RequestDto} requestDto - The request data transfer object containing proxy settings.
+   * @returns {Promise<any>} - A promise that resolves to the launched browser instance.
+   */
+  private async launchBrowser(requestDto: RequestDto): Promise<any> {
     this.logger.log('Launching browser...');
     const args: string[] = [
       '--window-size=1920,1080',
@@ -63,6 +73,11 @@ export class BrowserService {
     return await puppeteer.launch(options);
   }
 
+  /**
+   * Authenticates the page if username and password are provided in the request DTO.
+   * @param {any} page - The Puppeteer page instance.
+   * @param {RequestDto} requestDto - The request data transfer object containing authentication details.
+   */
   private async authenticatePage(page: any, requestDto: RequestDto) {
     if (requestDto.username && requestDto.password) {
       this.logger.log('Authenticating...');
@@ -73,6 +88,10 @@ export class BrowserService {
     }
   }
 
+  /**
+   * Sets up the Puppeteer page with user agent and viewport settings.
+   * @param {any} page - The Puppeteer page instance.
+   */
   private async setupPage(page: any) {
     this.logger.log('Setting up page...');
     const userAgent = new UserAgent({ deviceCategory: 'desktop' });
@@ -82,6 +101,11 @@ export class BrowserService {
     await page.setViewport({ width: 1920, height: 1080 });
   }
 
+  /**
+   * Navigates the Puppeteer page to the specified URL.
+   * @param {any} page - The Puppeteer page instance.
+   * @param {string} url - The URL to navigate to.
+   */
   private async navigateToUrl(page: any, url: string) {
     this.logger.log(`Navigating to ${url}...`);
     try {
@@ -99,6 +123,11 @@ export class BrowserService {
     }
   }
 
+  /**
+   * Extracts the HTML content from the Puppeteer page.
+   * @param {any} page - The Puppeteer page instance.
+   * @returns {Promise<string>} - A promise that resolves to the HTML content of the page.
+   */
   private async extractHtmlContent(page: any): Promise<string> {
     this.logger.log('Extracting HTML content...');
     return await page.content();

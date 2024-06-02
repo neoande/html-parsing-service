@@ -15,6 +15,13 @@ export class ParserService {
 
   constructor(private readonly llmService: LlmService) {}
 
+  /**
+   * Normalizes the HTML content by parsing it, chunking it, extracting relevant content,
+   * and processing it through an LLM service.
+   * @param {string} htmlContent - The raw HTML content to be normalized.
+   * @param {string} originalUrl - The original URL of the HTML content.
+   * @returns {Promise<any>} - A promise that resolves to the normalized content.
+   */
   async getNormalizedContent(
     htmlContent: string,
     originalUrl: string,
@@ -45,12 +52,22 @@ export class ParserService {
     return responses;
   }
 
+  /**
+   * Parses the given HTML content into a DOM structure.
+   * @param {string} htmlContent - The raw HTML content to be parsed.
+   * @returns {HTMLElement} - The parsed HTML element.
+   */
   private parseHtml(htmlContent: string) {
     this.logger.log('Parsing HTML content');
     return parse(htmlContent);
   }
 
-  // Chunk the HTML content into smaller parts to avoid hitting the token limit
+  /**
+   * Chunks the HTML content into smaller parts to avoid hitting the token limit.
+   * @param {HTMLElement} element - The HTML element to be chunked.
+   * @param {number} chunkSize - The maximum size of each chunk.
+   * @returns {HTMLElement[]} - An array of chunked HTML elements.
+   */
   private chunkHTML(element: HTMLElement, chunkSize: number): HTMLElement[] {
     const chunks: HTMLElement[] = [];
     let currentChunk: HTMLElement = parse('<div></div>');
@@ -91,6 +108,13 @@ export class ParserService {
     return chunks;
   }
 
+  /**
+   * Extracts content with tables and images from the parsed HTML.
+   * @param {HTMLElement} parsedHtml - The parsed HTML element.
+   * @param {string} originalUrl - The original URL of the HTML content.
+   * @param {string} folderPath - The folder path to save extracted content.
+   * @returns {Promise<string>} - A promise that resolves to the combined content.
+   */
   private async extractContentWithTablesAndImages(
     parsedHtml: HTMLElement,
     originalUrl: string,
@@ -106,6 +130,13 @@ export class ParserService {
     return combinedContent;
   }
 
+  /**
+   * Traverses a node and extracts its content, handling tables and images specifically.
+   * @param {any} node - The node to traverse.
+   * @param {string} originalUrl - The original URL of the HTML content.
+   * @param {string} folderPath - The folder path to save extracted content.
+   * @returns {Promise<string>} - A promise that resolves to the extracted content.
+   */
   private async traverseNode(
     node: any,
     originalUrl: string,
@@ -140,10 +171,22 @@ export class ParserService {
     return content;
   }
 
+  /**
+   * Calculates the SHA-256 hash of the given content.
+   * @param {string | Buffer} content - The content to hash.
+   * @returns {string} - The calculated hash.
+   */
   private calculateHash(content: string | Buffer): string {
     return createHash('sha256').update(content).digest('hex');
   }
 
+  /**
+   * Saves the given content to a file.
+   * @param {string} filename - The name of the file.
+   * @param {string | Buffer} content - The content to save.
+   * @param {string} folderPath - The folder path to save the file in.
+   * @param {boolean} [isBinary=false] - Whether the content is binary.
+   */
   private saveToFile(
     filename: string,
     content: string | Buffer,
@@ -159,12 +202,22 @@ export class ParserService {
     }
   }
 
+  /**
+   * Fetches an image from the given URL.
+   * @param {string} url - The URL of the image.
+   * @returns {Promise<Buffer>} - A promise that resolves to the image content as a buffer.
+   */
   private async fetchImage(url: string): Promise<Buffer> {
     this.logger.log(`Fetching image from ${url}`);
     const response = await axios.get(url, { responseType: 'arraybuffer' });
     return Buffer.from(response.data, 'binary');
   }
 
+  /**
+   * Converts an HTML table node to CSV format.
+   * @param {any} tableNode - The table node to convert.
+   * @returns {string} - The CSV representation of the table.
+   */
   private convertTableToCSV(tableNode: any): string {
     let csvContent = '';
     const rows = tableNode.querySelectorAll('tr');
@@ -180,12 +233,23 @@ export class ParserService {
     return csvContent;
   }
 
+  /**
+   * Extracts the image URL from an image element.
+   * @param {any} imgElement - The image element.
+   * @param {string} originalUrl - The original URL of the HTML content.
+   * @returns {string} - The extracted image URL.
+   */
   private extractImageUrl(imgElement: any, originalUrl: string): string {
     this.logger.log('Extracting image URL');
     const src = imgElement.getAttribute('src');
     return new URL(src, originalUrl).href;
   }
 
+  /**
+   * Sanitizes the content by removing unnecessary characters and formatting.
+   * @param {string} content - The content to sanitize.
+   * @returns {string} - The sanitized content.
+   */
   private sanitizeContent(content: string): string {
     this.logger.log('Sanitizing content');
     // Remove <!DOCTYPE html> if present
@@ -210,6 +274,11 @@ export class ParserService {
     return content;
   }
 
+  /**
+   * Creates a folder for saving results based on the URL and timestamp.
+   * @param {string} url - The original URL of the HTML content.
+   * @returns {string} - The created folder path.
+   */
   private createFolderForResults(url: string): string {
     const normalizedUrl = new URL(url).toString();
     const urlHash = crypto
@@ -226,7 +295,18 @@ export class ParserService {
     return folderPath;
   }
 
-  private async saveContent(url: string, content: string, folderPath: string) {
+  /**
+   * Saves the final content to a file.
+   * @param {string} url - The original URL of the HTML content.
+   * @param {string} content - The content to save.
+   * @param {string} folderPath - The folder path to save the content in.
+   * @returns {Promise<void>} - A promise that resolves when the content is saved.
+   */
+  private async saveContent(
+    url: string,
+    content: string,
+    folderPath: string,
+  ): Promise<void> {
     this.logger.log('Saving content...');
     const filename = `result.txt`;
     const filePath = path.join(folderPath, filename);
