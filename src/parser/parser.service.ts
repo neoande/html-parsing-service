@@ -8,7 +8,7 @@ import { LlmService } from '../llm/llm.service';
 import crypto from 'crypto';
 
 const TEXT_TYPE_NODE = 3;
-const MAX_CHUNK_SIZE = 100;
+const MAX_CHUNK_SIZE = 3000;
 @Injectable()
 export class ParserService {
   private readonly logger = new Logger(ParserService.name);
