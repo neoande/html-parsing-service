@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { parse } from 'node-html-parser';
+import { parse, HTMLElement } from 'node-html-parser';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -8,7 +8,7 @@ import { LlmService } from '../llm/llm.service';
 import crypto from 'crypto';
 
 const TEXT_TYPE_NODE = 3;
-
+const MAX_CHUNK_SIZE = 100;
 @Injectable()
 export class ParserService {
   private readonly logger = new Logger(ParserService.name);
@@ -18,24 +18,31 @@ export class ParserService {
   async getNormalizedContent(
     htmlContent: string,
     originalUrl: string,
-  ): Promise<string> {
+  ): Promise<any> {
     this.logger.log('Normalizing the HTML content');
     const parsedHtml = this.parseHtml(htmlContent);
     const folderPath = this.createFolderForResults(originalUrl);
-    const tableImageTextContent = await this.extractContentWithTablesAndImages(
-      parsedHtml,
-      originalUrl,
-      folderPath,
-    );
+    const chunks = this.chunkHTML(parsedHtml, MAX_CHUNK_SIZE);
 
-    // Combine the content
-    // Sanitize the combined content
-    const combinedContent = this.sanitizeContent(tableImageTextContent);
-    // Process content with LLM service
-    const jsonText = await this.llmService.processText(combinedContent);
-    // Save the content to a file
-    await this.saveContent(originalUrl, jsonText, folderPath);
-    return jsonText;
+    const responses = [];
+    for (const chunk of chunks) {
+      if (chunk.childNodes.length === 0) {
+        continue;
+      }
+      this.logger.log(`Processing chunk of size ${chunk.outerHTML.length}`);
+      const tableImageTextContent =
+        await this.extractContentWithTablesAndImages(
+          chunk,
+          originalUrl,
+          folderPath,
+        );
+      const sanitizedContent = this.sanitizeContent(tableImageTextContent);
+      const response = await this.llmService.processText(sanitizedContent);
+      responses.push(JSON.parse(response));
+    }
+
+    await this.saveContent(originalUrl, JSON.stringify(responses), folderPath);
+    return responses;
   }
 
   private parseHtml(htmlContent: string) {
@@ -43,8 +50,49 @@ export class ParserService {
     return parse(htmlContent);
   }
 
+  // Chunk the HTML content into smaller parts to avoid hitting the token limit
+  private chunkHTML(element: HTMLElement, chunkSize: number): HTMLElement[] {
+    const chunks: HTMLElement[] = [];
+    let currentChunk: HTMLElement = parse('<div></div>');
+    let currentSize = 0;
+
+    const appendNodeToChunk = (node: HTMLElement) => {
+      const nodeHTML = node.outerHTML;
+      // If adding this node exceeds chunk size and current chunk is not empty, start a new chunk
+      if (currentSize + nodeHTML.length > chunkSize && currentSize > 0) {
+        chunks.push(currentChunk);
+        currentChunk = parse('<div></div>');
+        currentSize = 0;
+      }
+      // If the node itself is larger than chunk size, it becomes its own chunk
+      if (nodeHTML.length > chunkSize) {
+        chunks.push(parse(node.outerHTML));
+      } else {
+        currentChunk.appendChild(parse(node.outerHTML));
+        currentSize += nodeHTML.length;
+      }
+    };
+
+    const traverseNodes = (node: HTMLElement) => {
+      node.childNodes.forEach((child) => {
+        if (child instanceof HTMLElement) {
+          appendNodeToChunk(child);
+        }
+      });
+    };
+
+    traverseNodes(element);
+
+    // Add the last chunk if it has content
+    if (currentChunk.childNodes.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  }
+
   private async extractContentWithTablesAndImages(
-    parsedHtml: any,
+    parsedHtml: HTMLElement,
     originalUrl: string,
     folderPath: string,
   ): Promise<string> {
